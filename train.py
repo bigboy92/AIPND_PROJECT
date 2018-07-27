@@ -1,5 +1,5 @@
 # Student Name: James Kekong
-
+# python train.py flowers
 import torch
 from torch import nn
 from torch import optim
@@ -20,10 +20,8 @@ def main():
     args = get_arguments()
     input_layers = None
     output_size = None
-    if not os.path.exists(args.save_dir):
-        os.makedirs(args.save_dir)
-    save_dir = os.path.join(args.save_dir, 'checkpoint.pth')
-    
+    epochs = None
+    lr = None    
     if args.model == 'densenet121':
         input_layers = 1024
         output_size = 102
@@ -64,28 +62,26 @@ def main():
     
     criterion = nn.NLLLoss()
     optimizer = optim.Adam(model.classifier.parameters(), lr=args.lr)
-    
-    train_model(model, data_loaders, criterion=criterion, optimizer=optimizer, epochs=int(args.epochs), cuda=args.cuda)
-    
-    validate_model(model, data_loaders[2], cuda=args.cuda)
-
+     
+    train_model(model, trainloader, validloader, criterion=criterion, optimizer=optimizer, epochs=int(args.epochs), cuda=args.cuda)
+    validate_model(model, testloader, cuda=args.cuda)
     checkpoint = {'input_size': input_layers,
-              'output_size': output_layers,
-              'epochs': agrs.epochs,
+              'output_size': output_size,
+              'epochs': epochs,
               'batch_size': 64,
-              'learning_rate':args.lr,    
+              'learning_rate': lr,    
               'model': model,
               'classifier': classifier,
+              'class_to_idx':  trainloader.dataset.class_to_idx,
               'optimizer': optimizer.state_dict(),
-              'state_dict': model.state_dict(),
-              'class_to_idx': model.class_to_idx
+              'state_dict': model.state_dict()
              }
     torch.save(checkpoint, 'checkpoint.pth')
 
 def get_arguments():
     parser = argparse.ArgumentParser()
     
-    parser.add_argument("--save_dir", action="store", dest="save_dir", default="." , help = "Set directory to save checkpoints")
+    parser.add_argument("--save_dir", action="store", dest="save_dir", default="checkpoint.pth" , help = "Set directory to save checkpoints")
     parser.add_argument("--model", action="store", dest="model", default="densenet121" , help = "Set architechture('densenet121' or     'vgg19')")
     parser.add_argument("--learning_rate", action="store", dest="lr", default=0.001 , help = "Set learning rate")
     parser.add_argument("--hidden_units", action="store", dest="hidden_units", default=512 , help = "Set number of hidden units")
@@ -135,10 +131,10 @@ def data_parser(data_path):
     return trainloader, validloader, testloader, valid_data, train_data, test_data, train_transforms, test_transforms, valid_transforms
     
     
-def train_model(model, trainloaders, validloader, criterion, optimizer, epochs=3, cuda=False):
+def train_model(model, trainloader, validloader, criterion, optimizer, epochs=3, cuda=False):
     start_time = time.time()
     if cuda and torch.cuda.is_available():
-    model.cuda()
+        model.cuda()
     else:
         model.cpu()
 
@@ -151,6 +147,7 @@ def train_model(model, trainloaders, validloader, criterion, optimizer, epochs=3
             steps += 1
 
             if torch.cuda.is_available():
+                model.cuda()
                 inputs, targets = inputs.cuda(), labels.cuda()
 
             optimizer.zero_grad()        
@@ -185,7 +182,7 @@ def train_model(model, trainloaders, validloader, criterion, optimizer, epochs=3
     elapsed_time = time.time() - start_time
     print('Elapsed Time: {:.0f}m {:.0f}s'.format(elapsed_time//60, elapsed_time % 60))
     
-def validate_model(model, testloaders, cuda=False):
+def validate_model(model, testloader, cuda=False):
     model.eval()
     accuracy = 0
     if cuda and torch.cuda.is_available():
@@ -198,6 +195,7 @@ def validate_model(model, testloaders, cuda=False):
         labels = labels
         with torch.no_grad():
             if torch.cuda.is_available():
+                model.cuda()
                 inputs, labels = inputs.cuda(), labels.cuda()
             output = model.forward(inputs)
             ps = torch.exp(output).data

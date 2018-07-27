@@ -1,4 +1,5 @@
-# Student Name: Samuel Havard
+# Student Name: James Kekong
+# python predict.py flowers/test/102/image_08030.jpg checkpoint.pth
 
 import torch
 from torch import nn
@@ -22,14 +23,16 @@ def main():
     with open(args.categories, 'r') as f:
         cat_to_name = json.load(f)
       
-    prob, classes = predict(args.image_path, model, 
+    prob, classes = predict(args.input, model, 
                                           class_to_idx, 
                                           idx_to_class, 
                                           cat_to_name, 
-                                          topk=args.topk,
-                                          args.cuda)
+                                          topk=args.top_k,
+                                          cuda= False)
+    print(prob)
     print([cat_to_name[x] for x in classes])
     
+    print("The prediction is \"{}\" with a certainty of {:.3f}%".format([cat_to_name[x] for x in classes][0], prob[0]*100))
     
 def get_arguments():
     """ 
@@ -83,8 +86,9 @@ def predict(image_path, model, class_to_idx, idx_to_class ,cat_to_name, topk=5, 
         image = process_image(img)
     with torch.no_grad():
         if torch.cuda.is_available():
+            model.cuda()
             image = image.cuda()
-    
+            
         image = image.unsqueeze(0)
         output = model.forward(image.float())
         ps = torch.exp(output).data.cpu().numpy()[0]
@@ -98,7 +102,7 @@ def load_checkpoint(filepath, cuda):
     model = checkpoint['model']
     model.classifier = checkpoint['classifier']
     model.load_state_dict(checkpoint['state_dict'])
-    model.class_to_idx = checkpoint['class_to_idx']
+    class_to_idx = checkpoint['class_to_idx']
     optimizer = checkpoint['optimizer']
     epochs = checkpoint['epochs']
     
